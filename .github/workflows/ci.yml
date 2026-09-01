@@ -1,0 +1,45 @@
+name: tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+
+      - name: Run the test suite
+        run: pytest -q tests/
+
+      - name: Smoke-test the CLI on every shape
+        run: |
+          python nfc_spiral.py --length 46 --width 20 --turns 6 \
+                 --trace 0.24 --gap 0.15 --outdir /tmp/ci --out rect
+          python nfc_spiral.py --length 46 --width 20 --turns 6 \
+                 --trace 0.24 --gap 0.15 --corner-r auto --term-pos center \
+                 --outdir /tmp/ci --out rrect
+          python nfc_spiral.py --shape circle --length 35 --width 35 --turns 5 \
+                 --trace 0.5 --gap 0.3 --outdir /tmp/ci --out circle
+          python nfc_spiral.py --shape octagon --length 30 --width 30 --turns 7 \
+                 --trace 0.3 --gap 0.2 --outdir /tmp/ci --out octagon
+          python nfc_spiral.py --length 40 --width 30 --trace 0.35 --gap 0.25 \
+                 --target-l 2.5 --outdir /tmp/ci --out solved
+          test -s /tmp/ci/rect.dxf && test -s /tmp/ci/rrect.kicad_mod
