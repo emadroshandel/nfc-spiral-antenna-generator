@@ -5,6 +5,10 @@ a turn count, a trace width and a gap; it draws the coil, computes its
 inductance, checks the copper clearance, and writes **DXF** you can import into
 any ECAD tool — plus a ready-to-place KiCad footprint.
 
+**[▶ Try it in your browser](https://emadroshandel.github.io/nfc-spiral-antenna-generator/)**
+— no install, nothing uploaded; the page runs this repository's own
+`nfc_spiral.py` under Pyodide.
+
 ![GUI](docs/images/gui.png)
 
 Two ways to drive it: a desktop GUI with a live preview, or a command line /
