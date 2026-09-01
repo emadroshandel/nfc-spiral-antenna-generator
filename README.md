@@ -42,7 +42,7 @@ python nfc_spiral.py --length 46 --width 20 --turns 6 \
 
 ## 1. Why this exists
 
-Drawing a six-turn spiral by hand in a PCB editor is twenty minutes of
+Drawing an N-turn spiral by hand in a PCB editor is twenty minutes of
 mouse-work that has to be redone from scratch every time the inductance target
 moves. Online calculators give you a number but no geometry. CAD tools give you
 geometry but no number.
