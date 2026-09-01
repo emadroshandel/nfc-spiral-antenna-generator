@@ -1,0 +1,50 @@
+name: deploy web app
+
+# Publishes the browser version to GitHub Pages. The page fetches
+# nfc_spiral.py at runtime and executes it under Pyodide, so the site and the
+# desktop tool always run byte-identical code -- there is no second
+# implementation to keep in sync.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble the site
+        run: |
+          mkdir -p _site
+          cp web/index.html _site/
+          cp nfc_spiral.py  _site/          # fetched by the page at runtime
+          mkdir -p _site/examples
+          cp examples/*.dxf examples/*.png examples/*.json _site/examples/ || true
+          # keep Jekyll from touching it
+          touch _site/.nojekyll
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
