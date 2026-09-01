@@ -524,19 +524,6 @@ Worth knowing before you trust a number:
 
 ## 14. Troubleshooting
 
-**`RuntimeError: ezdxf is required`** — your IDE is running a *different* Python
-from the one you installed into. Run `python nfc_spiral.py --check-deps` to see
-which interpreter is executing, then `--install-deps` to install into that same
-one. Doing it by hand, always use `<full path to python> -m pip install ...`,
-never bare `pip`. In VS Code: `Ctrl+Shift+P` → *Python: Select Interpreter*.
-
-**The files are not where I expected** — outputs go to `output/` next to the
-script; the run prints absolute paths. Use `--outdir` to change it.
-
-**Editing the dataclass did nothing** — it should; the argparse defaults are
-read from `AntennaSpec`. Make sure you are editing the same `nfc_spiral.py` you
-are running.
-
 **"the last N turn(s) keep sharp corners"** — your `corner_r` is too small. It
 shrinks one pitch per turn; see §9.2 and use `--corner-r auto`.
 
