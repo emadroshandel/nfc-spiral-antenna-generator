@@ -1,0 +1,12 @@
+# Core -------------------------------------------------------------------------
+ezdxf>=1.0        # DXF export
+shapely>=2.0      # copper outline + clearance measurement (STRtree)
+matplotlib>=3.5   # PNG preview and the GUI canvas
+
+# Tkinter is used by the GUI but is part of CPython, not a pip package.
+#   Debian/Ubuntu:  sudo apt install python3-tk
+#   Fedora:         sudo dnf install python3-tkinter
+#   Windows/macOS:  included with the standard installer
+
+# Tests ------------------------------------------------------------------------
+# pytest>=7.0
