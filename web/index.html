@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFC Spiral Antenna Generator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230f3a25'/%3E%3Cg fill='none' stroke='%23b87333' stroke-width='2'%3E%3Crect x='5' y='7' width='22' height='18'/%3E%3Crect x='9' y='11' width='14' height='10'/%3E%3C/g%3E%3C/svg%3E">
+<meta name="description" content="Design a planar NFC/RFID spiral antenna in your browser and download DXF for any ECAD tool. Inductance, Q and tuning capacitor computed with a Greenhouse partial-inductance model.">
+<style>
+  :root{
+    --bg:#f7f7f5; --panel:#fff; --ink:#1c1c1a; --muted:#6b6b66; --line:#e0e0da;
+    --accent:#8a5a2b; --pcb:#0f3a25; --copper:#b87333; --gold:#e8c33a;
+    --blue:#4da3ff; --warn:#a8620c; --err:#b3261e;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#16161a; --panel:#1e1e23; --ink:#eceae4; --muted:#9a9a93;
+           --line:#33333a; --accent:#d19a5e; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent)}
+  header{padding:22px 20px 14px;border-bottom:1px solid var(--line);
+    display:flex;flex-wrap:wrap;gap:12px;align-items:baseline}
+  header h1{margin:0;font-size:19px;letter-spacing:-.01em}
+  header p{margin:0;color:var(--muted);flex:1 1 320px}
+  main{display:grid;grid-template-columns:340px 1fr;gap:18px;padding:18px 20px 40px;
+    max-width:1500px;margin:0 auto}
+  @media (max-width:900px){ main{grid-template-columns:1fr} }
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  fieldset{border:0;padding:0;margin:0 0 16px}
+  legend{font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--muted);padding:0 0 6px}
+  .row{display:grid;grid-template-columns:1fr 108px;gap:8px;align-items:center;margin-bottom:5px}
+  .row label{font-size:13px}
+  input,select,button{font:inherit;color:inherit}
+  input,select{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:6px;
+    background:var(--bg)}
+  input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px}
+  .check{display:flex;gap:7px;align-items:center;margin:4px 0}
+  .check input{width:auto}
+  button{padding:8px 10px;border:1px solid var(--line);border-radius:7px;
+    background:var(--bg);cursor:pointer;width:100%}
+  button:hover:not(:disabled){border-color:var(--accent)}
+  button:disabled{opacity:.5;cursor:default}
+  button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:600}
+  .btns{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+  .btns .wide{grid-column:1/-1}
+  #stage{background:var(--pcb);border-radius:8px;overflow:hidden;min-height:300px;
+    display:flex;align-items:center;justify-content:center}
+  #stage svg{width:100%;height:auto;display:block}
+  table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+  td{padding:3px 0;vertical-align:baseline}
+  td:first-child{color:var(--muted);white-space:nowrap;padding-right:14px}
+  .big{font-size:22px;font-weight:650;letter-spacing:-.02em}
+  .msg{padding:8px 10px;border-radius:7px;margin-bottom:9px;font-size:13px}
+  .msg.warn{background:#fff4e5;color:var(--warn);border:1px solid #f0d3a8}
+  .msg.err{background:#fdecea;color:var(--err);border:1px solid #f2c2bd}
+  @media (prefers-color-scheme:dark){
+    .msg.warn{background:#3a2a12;border-color:#5c431c}
+    .msg.err{background:#3a1a18;border-color:#5c2723}
+  }
+  #boot{padding:26px;text-align:center;color:var(--muted)}
+  .bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden;margin:12px auto;
+    max-width:280px}
+  .bar i{display:block;height:100%;background:var(--accent);width:8%;
+    transition:width .4s ease}
+  .hint{color:var(--muted);font-size:12px;margin:6px 0 0}
+  footer{border-top:1px solid var(--line);padding:16px 20px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NFC Spiral Antenna Generator</h1>
+  <p>Planar 13.56&nbsp;MHz coil design — geometry, inductance and DXF, computed in your
+     browser. Nothing is uploaded.</p>
+  <a id="repo" href="#">Source on GitHub</a>
+</header>
+
+<main>
+  <!-- ------------------------------------------------------------ controls -->
+  <section class="card" id="controls" hidden>
+    <fieldset>
+      <legend>Geometry</legend>
+      <div class="row"><label for="shape">Shape</label>
+        <select id="shape">
+          <option value="rect">rectangular</option>
+          <option value="rrect" selected>rounded corners</option>
+          <option value="octagon">octagon (square outline)</option>
+          <option value="circle">circle (square outline)</option>
+        </select></div>
+      <div class="row"><label for="length">Outer length X (mm)</label>
+        <input id="length" type="number" step="0.1" value="46"></div>
+      <div class="row"><label for="width">Outer width Y (mm)</label>
+        <input id="width" type="number" step="0.1" value="20"></div>
+      <div class="row"><label for="turns">Turns</label>
+        <input id="turns" type="number" step="1" min="1" value="6"></div>
+      <div class="row"><label for="trace">Conductor width (mm)</label>
+        <input id="trace" type="number" step="0.01" value="0.24"></div>
+      <div class="row"><label for="gap">Turn-to-turn gap (mm)</label>
+        <input id="gap" type="number" step="0.01" value="0.15"></div>
+      <div class="row"><label for="corner_r">Corner radius (mm)</label>
+        <input id="corner_r" type="number" step="0.1" value="5.915"></div>
+      <div class="row"><label for="thickness_um">Copper thickness (µm)</label>
+        <input id="thickness_um" type="number" step="1" value="35"></div>
+      <button id="autoR" type="button">Corner radius → auto</button>
+    </fieldset>
+
+    <fieldset>
+      <legend>Terminal &amp; pads</legend>
+      <div class="row"><label for="term_pos">Terminal position</label>
+        <input id="term_pos" type="text" value="center"></div>
+      <p class="hint">right · center · left · or an x coordinate in mm</p>
+      <div class="row"><label for="pad_side">Return pad side</label>
+        <select id="pad_side">
+          <option value="auto" selected>auto</option>
+          <option value="left">left</option>
+          <option value="right">right</option>
+        </select></div>
+      <div class="check"><input id="make_bridge" type="checkbox" checked>
+        <label for="make_bridge">Bottom-layer return bridge</label></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Electrical</legend>
+      <div class="row"><label for="freq_mhz">Frequency (MHz)</label>
+        <input id="freq_mhz" type="number" step="0.01" value="13.56"></div>
+      <div class="row"><label for="chip_cap_pf">Chip capacitance (pF)</label>
+        <input id="chip_cap_pf" type="number" step="0.1" value="28.5"></div>
+      <div class="row"><label for="proximity_factor">Proximity factor</label>
+        <input id="proximity_factor" type="number" step="0.1" value="1"></div>
+      <div class="row"><label for="board_margin">Board margin (mm, &lt;0 none)</label>
+        <input id="board_margin" type="number" step="0.5" value="1.5"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Solve</legend>
+      <div class="row"><label for="target_l">Target inductance (µH)</label>
+        <input id="target_l" type="number" step="0.1" value="2.5"></div>
+      <button id="solve" type="button">Find the turn count</button>
+    </fieldset>
+
+    <fieldset style="margin-bottom:0">
+      <legend>Download</legend>
+      <div class="btns">
+        <button class="primary wide" id="dlDxf" type="button">DXF</button>
+        <button id="dlKicad" type="button">KiCad</button>
+        <button id="dlJson" type="button">JSON</button>
+        <button class="wide" id="dlSvg" type="button">SVG drawing</button>
+      </div>
+    </fieldset>
+  </section>
+
+  <!-- ------------------------------------------------------------- output -->
+  <section>
+    <div class="card" id="boot">
+      <strong>Starting Python in your browser…</strong>
+      <div class="bar"><i id="bootbar"></i></div>
+      <div id="bootmsg">loading Pyodide</div>
+      <p class="hint">First visit downloads the runtime (~25&nbsp;MB) and caches it.
+         The generator itself is the same code as the desktop version.</p>
+    </div>
+
+    <div id="app" hidden>
+      <div id="messages"></div>
+      <div class="card" style="margin-bottom:14px"><div id="stage"></div></div>
+      <div class="card">
+        <table id="results"></table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  MIT licensed · analytical model, expect ±5–10&nbsp;% versus measurement · always
+  trim on the bench.
+</footer>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v314.0.6/full/pyodide.js"></script>
+<script>
+const REPO = "https://github.com/emadroshandel/nfc-spiral-antenna-generator";
+document.getElementById("repo").href = REPO;
+
+const $ = id => document.getElementById(id);
+const FIELDS = ["shape","length","width","turns","trace","gap","corner_r",
+                "thickness_um","term_pos","pad_side","freq_mhz","chip_cap_pf",
+                "proximity_factor","board_margin"];
+const NUMERIC = new Set(["length","width","turns","trace","gap","corner_r",
+                         "thickness_um","freq_mhz","chip_cap_pf",
+                         "proximity_factor","board_margin"]);
+
+let py = null, last = null, timer = null;
+
+function progress(pct, msg){
+  $("bootbar").style.width = pct + "%";
+  if (msg) $("bootmsg").textContent = msg;
+}
+
+async function boot(){
+  progress(12, "loading Pyodide");
+  py = await loadPyodide();
+
+  progress(38, "loading shapely (clearance checking)");
+  await py.loadPackage(["shapely", "micropip"]);
+
+  progress(66, "installing ezdxf (DXF writer)");
+  await py.pyimport("micropip").install("ezdxf");
+
+  progress(82, "fetching the generator");
+  const src = await (await fetch("nfc_spiral.py")).text();
+  py.FS.writeFile("/home/pyodide/nfc_spiral.py", src);
+
+  progress(92, "starting up");
+  await py.runPythonAsync(GLUE);
+
+  progress(100, "ready");
+  $("boot").hidden = true;
+  $("controls").hidden = false;
+  $("app").hidden = false;
+  refresh();
+}
+
+// ---- the Python side: one call in, one JSON blob out -----------------------
+const GLUE = String.raw`
+import json, sys, os
+sys.path.insert(0, "/home/pyodide")
+import nfc_spiral as ns
+
+
+def _round(seq, n=3):
+    return [[round(x, n), round(y, n)] for x, y in seq]
+
+
+def _spec(params):
+    return ns.AntennaSpec(**params)
+
+
+def generate(params_json):
+    p = json.loads(params_json)
+    name = p.pop("_name", "nfc_antenna")
+    sp = _spec(p)
+    errs = sp.validate()
+    if [e for e in errs if e.startswith("error:")]:
+        return json.dumps({"ok": False, "errors": errs})
+
+    geo = ns.build_geometry(sp)
+    res = ns.electrical(sp, geo)
+    res["min_clearance_mm"] = ns.measure_clearance(geo.top_path, sp.trace, sp.gap)
+    if (res["min_clearance_mm"] == res["min_clearance_mm"]
+            and res["min_clearance_mm"] < 0.98 * sp.gap):
+        errs.append(
+            "warn: drawn clearance %.4f mm is below the requested gap %g mm"
+            % (res["min_clearance_mm"], sp.gap))
+
+    polys = [{"outer": _round(ext), "holes": [_round(h) for h in holes]}
+             for ext, holes in ns.copper_polygons([(geo.top_path, sp.trace)])]
+
+    os.makedirs("/tmp/out", exist_ok=True)
+    dxf_path = "/tmp/out/%s.dxf" % name
+    ns.write_dxf(sp, geo, res, dxf_path)
+    kicad_path = "/tmp/out/%s.kicad_mod" % name
+    ns.write_kicad_mod(sp, geo, name, kicad_path)
+
+    hx, hy = sp.length / 2.0, sp.width / 2.0
+    board = None
+    if sp.board_margin >= 0:
+        m = sp.board_margin
+        y0 = -hy - sp.lead_out - sp.pad_h / 2.0 - m
+        board = [[-hx - m, y0], [hx + m, y0], [hx + m, hy + m], [-hx - m, hy + m]]
+
+    return json.dumps({
+        "ok": True,
+        "errors": errs,
+        "results": res,
+        "geometry": {
+            "copper": polys,
+            "bridge": _round(geo.bridge),
+            "pads": [list(geo.pad_outer)] + ([list(geo.pad_return)]
+                                             if sp.make_bridge else []),
+            "via": list(geo.via),
+            "board": board,
+            "keepout": [[-hx, -hy], [hx, -hy], [hx, hy], [-hx, hy]],
+            "pad_w": sp.pad_w, "pad_h": sp.pad_h, "via_pad": sp.via_pad,
+        },
+        "derived": {
+            "term_x": sp.term_x,
+            "term_x_min": sp.term_x_min,
+            "term_x_max": sp.term_x_max,
+            "corner_r_min": sp.min_corner_r_all_rounded,
+            "corner_r_max": sp.max_corner_r,
+            "inner_x": sp.length - 2 * sp.build_up,
+            "inner_y": sp.width - 2 * sp.build_up,
+        },
+        "files": {
+            "dxf": open(dxf_path, encoding="utf-8", errors="replace").read(),
+            "kicad_mod": open(kicad_path, encoding="utf-8").read(),
+            "json": json.dumps({"parameters": ns.asdict(sp), "results": res,
+                                "warnings": errs}, indent=2),
+        },
+    })
+
+
+def auto_corner(params_json):
+    p = json.loads(params_json)
+    p.pop("_name", None)
+    sp = _spec(p)
+    return json.dumps(round(0.5 * (sp.min_corner_r_all_rounded
+                                   + sp.max_corner_r), 3))
+
+
+def solve(params_json, target):
+    p = json.loads(params_json)
+    p.pop("_name", None)
+    return json.dumps(ns.solve_turns(_spec(p), float(target), verbose=False))
+`;
+
+// ---- collecting the form --------------------------------------------------
+function params(){
+  const p = {};
+  for (const f of FIELDS){
+    const el = $(f);
+    p[f] = NUMERIC.has(f) ? Number(el.value) : el.value;
+  }
+  p.turns = Math.max(1, Math.round(p.turns));
+  p.make_bridge = $("make_bridge").checked;
+  if (p.shape === "rect") p.corner_r = 0;
+  if (p.shape !== "rect" && p.shape !== "rrect") p.corner_r = 0;
+  p._name = "nfc_antenna";
+  return p;
+}
+
+function schedule(){
+  clearTimeout(timer);
+  timer = setTimeout(refresh, 260);
+}
+
+function refresh(){
+  if (!py) return;
+  let out;
+  try{
+    out = JSON.parse(py.globals.get("generate")(JSON.stringify(params())));
+  }catch(e){
+    showMessages(["error: " + e.message]); return;
+  }
+  showMessages(out.errors || []);
+  if (!out.ok){ $("stage").innerHTML = ""; $("results").innerHTML = ""; return; }
+  last = out;
+  draw(out.geometry);
+  report(out.results, out.derived);
+}
+
+function showMessages(errs){
+  const box = $("messages");
+  box.innerHTML = "";
+  for (const e of errs){
+    const hard = e.startsWith("error:");
+    const d = document.createElement("div");
+    d.className = "msg " + (hard ? "err" : "warn");
+    d.textContent = e.replace(/^(error|warn):\s*/, "");
+    box.appendChild(d);
+  }
+}
+
+// ---- SVG preview ----------------------------------------------------------
+function draw(g){
+  const pts = [];
+  for (const p of g.copper) pts.push(...p.outer);
+  if (g.board) pts.push(...g.board);
+  pts.push(...g.pads.map(p => [p[0], p[1]]));
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const pad = 2;
+  const x0 = Math.min(...xs) - pad, x1 = Math.max(...xs) + pad;
+  const y0 = Math.min(...ys) - pad, y1 = Math.max(...ys) + pad;
+  const w = x1 - x0, h = y1 - y0;
+
+  const poly = (a, cls) =>
+    `<polygon class="${cls}" points="${a.map(p => p[0] + "," + p[1]).join(" ")}"/>`;
+
+  let s = "";
+  for (const p of g.copper){
+    s += `<path class="cu" d="${ringPath(p.outer)}${p.holes.map(ringPath).join("")}"/>`;
+  }
+  if (g.bridge.length > 1){
+    s += `<polyline class="btm" points="${g.bridge.map(p => p[0] + "," + p[1]).join(" ")}"/>`;
+  }
+  s += `<circle class="via" cx="${g.via[0]}" cy="${g.via[1]}" r="${g.via_pad / 2}"/>`;
+  for (const c of g.pads){
+    s += `<rect class="pad" x="${c[0] - g.pad_w / 2}" y="${c[1] - g.pad_h / 2}"
+                width="${g.pad_w}" height="${g.pad_h}"/>`;
+  }
+  if (g.board) s += poly(g.board, "board");
+
+  $("stage").innerHTML =
+    `<svg viewBox="${x0} ${-y1} ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+       <style>
+         .cu{fill:var(--copper,#b87333);stroke:#7a4a1f;stroke-width:.02;fill-rule:evenodd}
+         .btm{fill:none;stroke:#4da3ff;stroke-width:.28;stroke-dasharray:1.1 .7;
+              stroke-linecap:butt}
+         .via{fill:#dcdcdc;stroke:#333;stroke-width:.04}
+         .pad{fill:#e8c33a;stroke:#333;stroke-width:.04}
+         .board{fill:none;stroke:#b9c6bf;stroke-width:.18;stroke-dasharray:1.8 1.2;opacity:.8}
+       </style>
+       <rect x="${x0}" y="${-y1}" width="${w}" height="${h}" fill="#0f3a25"/>
+       <g transform="scale(1,-1)">${s}</g>
+     </svg>`;
+}
+
+function ringPath(ring){
+  return "M" + ring.map(p => p[0] + " " + p[1]).join("L") + "Z";
+}
+
+// ---- results table --------------------------------------------------------
+function report(r, d){
+  const f = (v, n = 3) => (v === null || v !== v) ? "—" : Number(v).toFixed(n);
+  const rows = [
+    ["Inductance", `<span class="big">${f(r.L_uH, 3)} µH</span>
+       <span style="color:var(--muted)"> &nbsp;${r.model_used} model</span>`],
+    ["Q", `${f(r.Q, 0)} at ${f(r.f_MHz, 2)} MHz`],
+    ["Resistance", `${f(r.R_dc_ohm)} Ω DC · ${f(r.R_ac_ohm)} Ω AC
+       <span style="color:var(--muted)">(skin depth ${f(r.skin_depth_um, 1)} µm)</span>`],
+    ["Resonating C", `${f(r.C_total_resonant_pF, 2)} pF total` +
+      (r.C_external_pF !== undefined
+        ? ` → <b>${f(r.C_external_pF, 2)} pF external</b>
+            <span style="color:var(--muted)">(chip ${f(r.C_chip_pF, 1)} pF)</span>` : "")],
+    ["Conductor", `${f(r.conductor_length_mm, 1)} mm`],
+    ["Inner window", `${f(d.inner_x, 2)} × ${f(d.inner_y, 2)} mm`],
+    ["Measured clearance", `${f(r.min_clearance_mm, 4)} mm`],
+    ["Terminal x", `${f(d.term_x, 2)} mm
+       <span style="color:var(--muted)">(range ${f(d.term_x_min, 2)} … ${f(d.term_x_max, 2)})</span>`],
+  ];
+  if (!isNaN(r.L_ideal_closed_turns_uH)){
+    rows.splice(1, 0, ["Cross-checks",
+      `${f(r.L_ideal_closed_turns_uH, 3)} µH ideal closed turns ·
+       ${f(r.L_mohan_uH, 3)} µH Mohan`]);
+  }
+  $("results").innerHTML = rows
+    .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+}
+
+// ---- downloads ------------------------------------------------------------
+function save(text, filename, mime){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], {type: mime || "text/plain"}));
+  a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const base = () => `nfc_${$("length").value}x${$("width").value}_n${$("turns").value}`;
+
+$("dlDxf").onclick   = () => last && save(last.files.dxf, base() + ".dxf",
+                                          "image/vnd.dxf");
+$("dlKicad").onclick = () => last && save(last.files.kicad_mod,
+                                          base() + ".kicad_mod");
+$("dlJson").onclick  = () => last && save(last.files.json, base() + ".json",
+                                          "application/json");
+$("dlSvg").onclick   = () => {
+  const svg = $("stage").querySelector("svg");
+  if (svg) save(new XMLSerializer().serializeToString(svg), base() + ".svg",
+                "image/svg+xml");
+};
+
+// ---- helper buttons -------------------------------------------------------
+$("autoR").onclick = () => {
+  if (!py) return;
+  const p = params();
+  if (p.shape === "rect") $("shape").value = "rrect";
+  p.shape = "rrect"; p.corner_r = 0;
+  try{
+    $("corner_r").value =
+      JSON.parse(py.globals.get("auto_corner")(JSON.stringify(p)));
+    refresh();
+  }catch(e){ showMessages(["error: " + e.message]); }
+};
+
+$("solve").onclick = () => {
+  if (!py) return;
+  try{
+    const n = JSON.parse(py.globals.get("solve")(
+      JSON.stringify(params()), $("target_l").value));
+    if (n === null){ showMessages(["error: no turn count fits this outline"]); return; }
+    $("turns").value = n;
+    refresh();
+  }catch(e){ showMessages(["error: " + e.message]); }
+};
+
+for (const f of FIELDS) $(f).addEventListener("input", schedule);
+$("shape").addEventListener("change", schedule);
+$("make_bridge").addEventListener("change", schedule);
+
+boot().catch(e => {
+  $("boot").innerHTML =
+    `<strong>Could not start.</strong><p class="hint">${e.message}</p>
+     <p class="hint">The generator also runs as a normal desktop app —
+       see <a href="${REPO}">the repository</a>.</p>`;
+});
+</script>
+</body>
+</html>
