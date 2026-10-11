@@ -1,0 +1,97 @@
+name: release
+
+# Push a version tag to publish a GitHub Release with ready-to-run downloads:
+#
+#     git tag v1.1.0 && git push origin v1.1.0
+#
+#   nfc-spiral-antenna-generator-<tag>.zip          the desktop app (Python source
+#                                                   + double-click launchers)
+#   NFC-Spiral-Antenna-Generator-<tag>-windows.exe  single-file Windows app,
+#                                                   no Python needed
+#   nfc-spiral-antenna-generator-<tag>-web.zip      the static web app, for
+#                                                   hosting on any web server
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (e.g. v1.1.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  portable:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test
+        run: |
+          pip install -r requirements.txt pytest
+          pytest -q tests/
+      - name: Build the portable and web archives
+        run: |
+          NAME="nfc-spiral-antenna-generator-${TAG}"
+          mkdir -p dist "stage/${NAME}"
+          git archive HEAD | tar -x -C "stage/${NAME}"
+          rm -rf "stage/${NAME}/.github"
+          (cd stage && zip -qr "../dist/${NAME}.zip" "${NAME}")
+          python scripts/build_site.py --out "stage/${NAME}-web"
+          (cd stage && zip -qr "../dist/${NAME}-web.zip" "${NAME}-web")
+          ls -la dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: portable
+          path: dist/*
+
+  windows-exe:
+    runs-on: windows-latest
+    continue-on-error: true            # the source zip still ships if this fails
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build a single-file Windows app
+        shell: bash
+        run: |
+          pip install -r requirements.txt pywebview pyinstaller
+          pyinstaller --noconfirm --onefile --windowed \
+            --name "NFC-Spiral-Antenna-Generator-${TAG}-windows" \
+            --add-data "web;web" \
+            --add-data "examples/*.json;examples" \
+            --add-data "nfc_spiral.py;." --add-data "nfc_api.py;." \
+            --hidden-import nfc_api --hidden-import nfc_spiral \
+            --collect-all webview \
+            desktop.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.exe
+
+  publish:
+    needs: [portable, windows-exe]
+    if: always() && needs.portable.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ls -la dist
+          gh release create "$TAG" dist/* --repo "$GITHUB_REPOSITORY" \
+             --title "NFC Spiral Antenna Generator $TAG" --generate-notes \
+          || gh release upload "$TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
