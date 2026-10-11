@@ -5,19 +5,27 @@ a turn count, a trace width and a gap; it draws the coil, computes its
 inductance, checks the copper clearance, and writes **DXF** you can import into
 any ECAD tool — plus a ready-to-place KiCad footprint.
 
-**[▶ Try it in your browser](https://emadroshandel.github.io/nfc-spiral-antenna-generator/)**
+**[▶ Open the online app](https://emadroshandel.github.io/nfc-spiral-antenna-generator/)**
 — no install, nothing uploaded; the page runs this repository's own
-`nfc_spiral.py` under Pyodide.
+`nfc_spiral.py` in your browser under Pyodide.
 
 ![GUI](docs/images/gui.png)
 
-Two ways to drive it: a desktop GUI with a live preview, or a command line /
-Python API for batch and scripted work. One file each, no packaging, no
-framework.
+It runs four ways from the same engine:
+
+| | How | Needs |
+|---|---|---|
+| **Online app** | [emadroshandel.github.io/nfc-spiral-antenna-generator](https://emadroshandel.github.io/nfc-spiral-antenna-generator/) | a browser |
+| **Desktop app** | double-click `Run NFC Antenna (desktop).bat` · or `python desktop.py` · or the `.exe` from [Releases](https://github.com/emadroshandel/nfc-spiral-antenna-generator/releases) | Python 3.9+ (not for the `.exe`) |
+| **Local browser app** | `Run NFC Antenna (browser).bat` · or `python server.py` | Python 3.9+ |
+| **CLI / Python API** | `python nfc_spiral.py ...` · `from nfc_spiral import build` | Python 3.9+ |
+
+The online, desktop and local apps share one interface (`web/`); the classic
+Tkinter GUI (`nfc_spiral_gui.py`) is still there too.
 
 ```bash
 pip install ezdxf shapely matplotlib
-python nfc_spiral_gui.py                       # GUI
+python desktop.py                              # desktop app (pip install pywebview for a native window)
 python nfc_spiral.py --length 46 --width 20 --turns 6 \
                      --trace 0.24 --gap 0.15 --corner-r auto --term-pos center
 ```
@@ -29,7 +37,7 @@ python nfc_spiral.py --length 46 --width 20 --turns 6 \
 1. [Why this exists](#1-why-this-exists)
 2. [Install](#2-install)
 3. [Quick start](#3-quick-start)
-4. [The GUI](#4-the-gui)
+4. [The GUI](#4-the-gui) · [the web & desktop app](#41-the-web--desktop-app)
 5. [Command line](#5-command-line)
 6. [Python API](#6-python-api)
 7. [What it writes](#7-what-it-writes)
@@ -46,7 +54,7 @@ python nfc_spiral.py --length 46 --width 20 --turns 6 \
 
 ## 1. Why this exists
 
-Drawing an N-turn spiral by hand in a PCB editor is twenty minutes of
+Drawing a six-turn spiral by hand in a PCB editor is twenty minutes of
 mouse-work that has to be redone from scratch every time the inductance target
 moves. Online calculators give you a number but no geometry. CAD tools give you
 geometry but no number.
@@ -71,7 +79,7 @@ measurement, and see [Limitations](#13-limitations) for what it does not model.
 ## 2. Install
 
 ```bash
-git clone https://github.com/<you>/nfc-spiral-antenna-generator.git
+git clone https://github.com/emadroshandel/nfc-spiral-antenna-generator.git
 cd nfc-spiral-antenna-generator
 pip install -r requirements.txt
 ```
@@ -168,6 +176,65 @@ Nothing touches the disk until you press an export button.
 
 The preview uses the standard matplotlib toolbar, so you can pan and zoom into
 a corner to inspect it before exporting.
+
+---
+
+### 4.1 The web & desktop app
+
+One interface in `web/`, three ways to run it. `web/boot.js` decides at start-up
+where the calculation engine is:
+
+| Mode | Started by | Engine |
+|---|---|---|
+| **Desktop** | `desktop.py` / `Run NFC Antenna (desktop).bat` / release `.exe` | `server.py` on a private local port, shown in a native window ([pywebview](https://pywebview.flowrl.com)); downloads open a real *Save as* dialog |
+| **Local server** | `server.py` / `Run NFC Antenna (browser).bat` | same server, in your normal browser tab |
+| **Online** | GitHub Pages | no server: [Pyodide](https://pyodide.org) runs `nfc_spiral.py` + `nfc_api.py` inside the browser |
+
+In every mode the page only talks to `nfc_api.py`, a thin JSON layer over
+`nfc_spiral.py` — so the online app, the desktop app and the CLI produce the
+same DXF bytes and the same inductance. There is no second implementation to drift.
+
+What the interface does:
+
+- live preview (scroll to zoom, drag to pan, double-click to fit) with
+  dimensions, keep-out, bottom-layer bridge and optional centreline
+- inductance, Q, tuning capacitance and measured clearance at a glance; every
+  intermediate result under **All results**
+- **Turn sweep** — L, R, Q and C against turn count; click a point to use it;
+  **Find turn count** solves for a target inductance
+- every `AntennaSpec` parameter, presets from `examples/`, **Open…** for any
+  `.json` written by the CLI, GUI or app
+- downloads: DXF, KiCad footprint, JSON, SVG drawing
+- **Copy link** — a URL that reopens the exact design in the online app
+
+`server.py` uses only the standard library and listens on `127.0.0.1` by
+default (`--host 0.0.0.0` to share it on your network, `--port` to move it).
+Without pywebview, `desktop.py` opens the browser instead.
+
+**Online version.** First visit fetches the Python runtime (~15 MB) and
+caches it; afterwards it starts in a few seconds. The `ezdxf` wheel is bundled
+with the site, so it does not depend on PyPI at run time. Nothing you type
+leaves the machine.
+
+**Deployment** (all in `.github/workflows/`):
+
+| Workflow | When | What |
+|---|---|---|
+| `ci.yml` | every push / PR | tests on Python 3.9–3.13 (Linux) + Windows + macOS, CLI and server smoke tests, JS syntax check, site build check |
+| `pages.yml` | push to `main` | runs the tests, assembles the site with `scripts/build_site.py`, publishes to GitHub Pages |
+| `release.yml` | push a `v*` tag | GitHub Release with the portable app zip, a single-file Windows `.exe`, and the static web app zip |
+
+To publish a release: `git tag v1.1.0 && git push origin v1.1.0`.
+
+```
+web/index.html, styles.css    the interface
+web/boot.js                   picks desktop / server / in-browser engine
+web/app.js                    form, preview, sweep, downloads
+nfc_api.py                    JSON layer used by both server.py and Pyodide
+server.py                     local server (standard library only)
+desktop.py                    native window around server.py
+scripts/build_site.py         assembles the GitHub Pages site into _site/
+```
 
 ---
 
@@ -477,7 +544,7 @@ exceeds the resonating value, the report says so — the coil needs to be smalle
 ## 12. Validation and tests
 
 ```bash
-pytest -q tests/          # 59 tests
+pytest -q tests/          # 78 tests
 ```
 
 The suite checks the model against results that exist independently of this
@@ -500,7 +567,11 @@ tests cover concentric corner arcs, the polygon chord compensation, the
 aspect-ratio rejection, DXF layer presence, a full `ezdxf` audit, and balanced
 s-expressions in the KiCad footprint.
 
-CI runs the suite on Python 3.9–3.12 on every push.
+`tests/test_api_server.py` covers the application layer: the JSON API against the
+reference example, bad-input reporting, strict-JSON output, the turn sweep, and the
+local server's routing (including refusing paths outside the app).
+
+CI runs the suite on Python 3.9–3.13 on Linux, plus Windows and macOS, on every push.
 
 ---
 
@@ -527,6 +598,19 @@ Worth knowing before you trust a number:
 ---
 
 ## 14. Troubleshooting
+
+**`RuntimeError: ezdxf is required`** — your IDE is running a *different* Python
+from the one you installed into. Run `python nfc_spiral.py --check-deps` to see
+which interpreter is executing, then `--install-deps` to install into that same
+one. Doing it by hand, always use `<full path to python> -m pip install ...`,
+never bare `pip`. In VS Code: `Ctrl+Shift+P` → *Python: Select Interpreter*.
+
+**The files are not where I expected** — outputs go to `output/` next to the
+script; the run prints absolute paths. Use `--outdir` to change it.
+
+**Editing the dataclass did nothing** — it should; the argparse defaults are
+read from `AntennaSpec`. Make sure you are editing the same `nfc_spiral.py` you
+are running.
 
 **"the last N turn(s) keep sharp corners"** — your `corner_r` is too small. It
 shrinks one pitch per turn; see §9.2 and use `--corner-r auto`.
