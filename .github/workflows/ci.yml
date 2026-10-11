@@ -8,11 +8,18 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: py${{ matrix.python-version }} · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        os: [ubuntu-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.12"
 
     steps:
       - uses: actions/checkout@v4
@@ -26,20 +33,55 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pytest
 
-      - name: Run the test suite
+      - name: Run the test suite (engine, API, local server)
         run: pytest -q tests/
 
       - name: Smoke-test the CLI on every shape
+        shell: bash
         run: |
+          OUT="${RUNNER_TEMP}/ci"
           python nfc_spiral.py --length 46 --width 20 --turns 6 \
-                 --trace 0.24 --gap 0.15 --outdir /tmp/ci --out rect
+                 --trace 0.24 --gap 0.15 --outdir "$OUT" --out rect
           python nfc_spiral.py --length 46 --width 20 --turns 6 \
                  --trace 0.24 --gap 0.15 --corner-r auto --term-pos center \
-                 --outdir /tmp/ci --out rrect
+                 --outdir "$OUT" --out rrect
           python nfc_spiral.py --shape circle --length 35 --width 35 --turns 5 \
-                 --trace 0.5 --gap 0.3 --outdir /tmp/ci --out circle
+                 --trace 0.5 --gap 0.3 --outdir "$OUT" --out circle
           python nfc_spiral.py --shape octagon --length 30 --width 30 --turns 7 \
-                 --trace 0.3 --gap 0.2 --outdir /tmp/ci --out octagon
+                 --trace 0.3 --gap 0.2 --outdir "$OUT" --out octagon
           python nfc_spiral.py --length 40 --width 30 --trace 0.35 --gap 0.25 \
-                 --target-l 2.5 --outdir /tmp/ci --out solved
-          test -s /tmp/ci/rect.dxf && test -s /tmp/ci/rrect.kicad_mod
+                 --target-l 2.5 --outdir "$OUT" --out solved
+          test -s "$OUT/rect.dxf" && test -s "$OUT/rrect.kicad_mod"
+
+      - name: Smoke-test the local server
+        shell: bash
+        run: |
+          python server.py --no-browser --port 8799 &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8799/api/health && break; sleep 0.5; done
+          curl -sf http://127.0.0.1:8799/ | grep -q "NFC Spiral Antenna Generator"
+          curl -sf -X POST http://127.0.0.1:8799/api/generate \
+               -H "Content-Type: application/json" \
+               -d '{"params":{"length":46,"width":20,"turns":6}}' | grep -q '"ok": true'
+          kill %1
+
+  web:
+    name: web interface
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: JavaScript syntax check
+        run: for f in web/*.js; do node --check "$f"; done
+      - name: Assemble the GitHub Pages site
+        run: python scripts/build_site.py --out _site
+      - name: Check the site layout
+        run: |
+          for f in index.html web/index.html web/app.js web/boot.js web/styles.css \
+                   nfc_spiral.py nfc_api.py wheels/index.json examples/st_reference.json; do
+            test -s "_site/$f" || { echo "missing $f"; exit 1; }
+          done
