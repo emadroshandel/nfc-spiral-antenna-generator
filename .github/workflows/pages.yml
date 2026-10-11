@@ -1,9 +1,15 @@
 name: deploy web app
 
-# Publishes the browser version to GitHub Pages. The page fetches
-# nfc_spiral.py at runtime and executes it under Pyodide, so the site and the
-# desktop tool always run byte-identical code -- there is no second
-# implementation to keep in sync.
+# Publishes the browser version to GitHub Pages:
+#   https://emadroshandel.github.io/nfc-spiral-antenna-generator/
+#
+# The page loads nfc_spiral.py + nfc_api.py at run time and executes them under
+# Pyodide, so the online app, the desktop app and the CLI always run
+# byte-identical code -- there is no second implementation to keep in sync.
+# The site is only published if the test suite passes.
+#
+# One-time setup: Settings -> Pages -> Build and deployment -> Source:
+# "GitHub Actions".
 
 on:
   push:
@@ -25,15 +31,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Assemble the site
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Test before publishing
         run: |
-          mkdir -p _site
-          cp web/index.html _site/
-          cp nfc_spiral.py  _site/          # fetched by the page at runtime
-          mkdir -p _site/examples
-          cp examples/*.dxf examples/*.png examples/*.json _site/examples/ || true
-          # keep Jekyll from touching it
-          touch _site/.nojekyll
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+          pytest -q tests/
+
+      - name: Assemble the site
+        run: python scripts/build_site.py --out _site
+
+      - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
