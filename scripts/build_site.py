@@ -14,11 +14,14 @@ Layout of the result (the same relative layout server.py uses locally):
     _site/examples/*.json    presets
     _site/wheels/            a pinned pure-Python ezdxf wheel, so the page does
                              not depend on PyPI being reachable at run time
+    _site/sitemap.xml        for Google Search Console (dated on every build)
+    _site/google*.html       any Search Console verification file in the repo root
 """
 
 from __future__ import annotations
 
 import argparse
+import datetime
 import glob
 import json
 import os
@@ -27,6 +30,25 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SITE_URL = "https://emadroshandel.github.io/nfc-spiral-antenna-generator/"
+
+# Pages listed in the sitemap: (path under SITE_URL, change frequency, priority).
+# Only real pages - not the root, which just redirects to web/.
+SITEMAP_PAGES = [
+    ("web/", "monthly", "1.0"),
+]
+
+
+def write_sitemap(out: str) -> None:
+    today = datetime.date.today().isoformat()
+    rows = "".join(
+        f"  <url>\n    <loc>{SITE_URL}{path}</loc>\n    <lastmod>{today}</lastmod>\n"
+        f"    <changefreq>{freq}</changefreq>\n    <priority>{prio}</priority>\n  </url>\n"
+        for path, freq, prio in SITEMAP_PAGES)
+    with open(os.path.join(out, "sitemap.xml"), "w", encoding="utf-8") as fh:
+        fh.write('<?xml version="1.0" encoding="UTF-8"?>\n'
+                 '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+                 + rows + "</urlset>\n")
 
 
 def main(argv=None):
@@ -48,6 +70,9 @@ def main(argv=None):
     for f in glob.glob(os.path.join(ROOT, "examples", "*.json")):
         shutil.copy2(f, os.path.join(out, "examples"))
     open(os.path.join(out, ".nojekyll"), "w").close()
+    write_sitemap(out)
+    for f in glob.glob(os.path.join(ROOT, "google*.html")):     # Search Console
+        shutil.copy2(f, out)
 
     if not a.no_wheel:
         wdir = os.path.join(out, "wheels")
