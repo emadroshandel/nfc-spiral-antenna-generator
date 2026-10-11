@@ -8,5 +8,10 @@ matplotlib>=3.5   # PNG preview and the GUI canvas
 #   Fedora:         sudo dnf install python3-tkinter
 #   Windows/macOS:  included with the standard installer
 
+# Desktop window (optional) ----------------------------------------------------
+# pywebview>=4.0   # native window for desktop.py; without it the app opens in
+#                  # your browser instead. Not installed automatically because it
+#                  # upgrades pythonnet on Windows - a virtual environment is safest.
+
 # Tests ------------------------------------------------------------------------
 # pytest>=7.0
